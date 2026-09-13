@@ -360,8 +360,12 @@ fn get_serial_from_env() -> Option<String> {
 /// Find a FIDO2 authenticator suitable for this plugin.
 ///
 /// This honors `FIDO2_SERIAL`, otherwise polls up to `timeout` and either
-/// auto-picks the only device or asks the user to disambiguate.
-pub fn find(timeout: Duration, ui: &mut dyn DiscoveryUi) -> Result<Box<dyn Fido2Device>> {
+/// picks a device with a matching credential or asks the user to disambiguate.
+pub fn find(
+   timeout: Duration,
+   credential_ids: &[&[u8]],
+   ui: &mut dyn DiscoveryUi,
+) -> Result<Box<dyn Fido2Device>> {
    let wanted_serial = get_serial_from_env();
 
    let started = Instant::now();
@@ -423,6 +427,23 @@ pub fn find(timeout: Duration, ui: &mut dyn DiscoveryUi) -> Result<Box<dyn Fido2
                return Ok(Box::new(CtapHidDevice::new(auth, None)));
             },
             n if n > 1 => {
+               if !credential_ids.is_empty() {
+                  for info in &eligible {
+                     let Ok(auth) = Authenticator::open(info) else {
+                        continue;
+                     };
+                     let device = CtapHidDevice::new(auth, None);
+                     for attempt in 0..4 {
+                        if attempt > 0 {
+                           thread::sleep(Duration::from_millis(120));
+                        }
+                        if matches!(device.probe_credential(credential_ids), Ok(Some(_))) {
+                           return Ok(Box::new(device));
+                        }
+                     }
+                  }
+               }
+
                let labels = eligible.iter().map(render_device).collect::<Vec<String>>();
                let idx = ui.pick_device(&labels)?;
                let info = eligible.into_iter().nth(idx).ok_or_else(|| {

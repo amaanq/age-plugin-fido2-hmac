@@ -190,7 +190,8 @@ impl RecipientPluginV1 for RecipientImpl {
                }
             },
             IdentityAsRecipient::Parsed(ref mut id) => {
-               let dev = match ensure_device(device, &mut callbacks) {
+               let credential_ids = [id.cred_id()];
+               let dev = match ensure_device(device, &credential_ids, &mut callbacks) {
                   Ok(dev) => dev,
                   Err(err) => {
                      errors.push(plugin_recipient::Error::Identity {
@@ -388,7 +389,7 @@ impl IdentityPluginV1 for IdentityImpl {
                .filter(|cid| !cid.is_empty())
                .collect::<Vec<&[u8]>>();
             if !cred_ids.is_empty()
-               && let Ok(dev) = ensure_device(device, &mut callbacks)
+               && let Ok(dev) = ensure_device(device, &cred_ids, &mut callbacks)
             {
                connected_cred = probe_connected_credential(dev.as_ref(), &cred_ids);
                cred_probed = true;
@@ -463,6 +464,7 @@ where
       file_requires_pin,
    } = cx;
 
+   let credential_ids = connected_cred.into_iter().collect::<Vec<_>>();
    let mut pin = if file_requires_pin {
       match ensure_pin(pin_cache, callbacks) {
          Ok(pin_val) => Some(pin_val),
@@ -481,7 +483,7 @@ where
       let mut tried_retry = false;
       let mut reopens = 0_u32;
       loop {
-         let dev = match ensure_device(device, callbacks) {
+         let dev = match ensure_device(device, &credential_ids, callbacks) {
             Ok(dev) => dev,
             Err(err) => {
                file_errors.push(plugin_identity::Error::Internal {
@@ -569,7 +571,7 @@ fn generate_fresh_recipient<C>(
 where
    C: Callbacks<plugin_recipient::Error>,
 {
-   let dev = ensure_device(device, callbacks)?;
+   let dev = ensure_device(device, &[], callbacks)?;
    let has_pin = dev.has_pin_set()?;
    let pin = if has_pin {
       Some(ensure_pin(pin_cache, callbacks)?)
@@ -611,6 +613,7 @@ where
 
 fn ensure_device<'a, C, E>(
    device: &'a mut Option<Box<dyn Fido2Device>>,
+   credential_ids: &[&[u8]],
    callbacks: &mut C,
 ) -> Result<&'a mut Box<dyn Fido2Device>, Error>
 where
@@ -618,7 +621,7 @@ where
 {
    if device.is_none() {
       let mut ui = CallbackUi::<C, E>::new(callbacks);
-      *device = Some(find(Duration::from_secs(50), &mut ui)?);
+      *device = Some(find(Duration::from_secs(50), credential_ids, &mut ui)?);
    }
    Ok(device.as_mut().expect("device just initialized"))
 }

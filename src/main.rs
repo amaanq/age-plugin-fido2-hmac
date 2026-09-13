@@ -187,7 +187,7 @@ fn generate(alg_str: &str) -> Result<(), Error> {
    let alg = alg_str.parse::<Algorithm>()?;
    let mut ui = TerminalUi;
 
-   let device = find(Duration::from_secs(50), &mut ui)?;
+   let device = find(Duration::from_secs(50), &[], &mut ui)?;
 
    let has_pin = device.has_pin_set()?;
    let pin = if has_pin {
@@ -313,7 +313,8 @@ fn identity_to_recipient(path: &str) -> Result<(), Error> {
       return Err(Error::InvalidFormat("no identities found".into()));
    }
 
-   let device = find(Duration::from_secs(50), &mut StderrOnlyUi)?;
+   let credential_ids = identities.iter().map(Identity::cred_id).collect::<Vec<_>>();
+   let device = find(Duration::from_secs(50), &credential_ids, &mut StderrOnlyUi)?;
 
    let pin = if identities.iter().any(Identity::require_pin) {
       Some(Zeroizing::new(

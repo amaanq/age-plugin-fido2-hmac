@@ -65,9 +65,11 @@ List eligible authenticators and their serials:
 age-plugin-fido2-hmac --list-devices
 ```
 
-When more than one authenticator is connected, set `FIDO2_SERIAL` to the
-serial of the one you want. Same serial format `ykman list` /
-`nitropy list` / `solo list` print.
+During decryption, the plugin probes each connected authenticator without a
+touch and uses the first one holding a credential for the ciphertext. Set
+`FIDO2_SERIAL` to override that choice or to choose an authenticator for
+credential generation. It accepts the same serial format printed by
+`ykman list`, `nitropy list`, and `solo list`.
 
 ```bash
 FIDO2_SERIAL=12345678 age-plugin-fido2-hmac --generate
